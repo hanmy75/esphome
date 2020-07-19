@@ -2,7 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import binary_sensor
-from esphome.const import CONF_DATA, CONF_TRIGGER_ID, CONF_NBITS, CONF_ADDRESS, \
+from esphome.const import CONF_DATA, CONF_DATA1, CONF_DATA2, CONF_TRIGGER_ID, CONF_NBITS, CONF_ADDRESS, \
     CONF_COMMAND, CONF_CODE, CONF_PULSE_LENGTH, CONF_SYNC, CONF_ZERO, CONF_ONE, CONF_INVERTED, \
     CONF_PROTOCOL, CONF_GROUP, CONF_DEVICE, CONF_STATE, CONF_CHANNEL, CONF_FAMILY, CONF_REPEAT, \
     CONF_WAIT_TIME, CONF_TIMES, CONF_TYPE_ID, CONF_CARRIER_FREQUENCY
@@ -643,6 +643,41 @@ def samsung_action(var, config, args):
     template_ = yield cg.templatable(config[CONF_DATA], args, cg.uint32)
     cg.add(var.set_data(template_))
 
+
+# Carrier
+(CarrierData, CarrierBinarySensor, CarrierTrigger, CarrierAction,
+ CarrierDumper) = declare_protocol('Carrier')
+CARRIER_SCHEMA = cv.Schema({
+    cv.Required(CONF_DATA1): cv.hex_uint32_t,
+    cv.Required(CONF_DATA2): cv.hex_uint32_t,
+})
+
+
+@register_binary_sensor('carrier', CarrierBinarySensor, CARRIER_SCHEMA)
+def carrier_binary_sensor(var, config):
+    cg.add(var.set_data(cg.StructInitializer(
+        CarrierData,
+        ('data1', config[CONF_DATA1]),
+        ('data2', config[CONF_DATA2]),
+    )))
+
+
+@register_trigger('carrier', CarrierTrigger, CarrierData)
+def carrier_trigger(var, config):
+    pass
+
+
+@register_dumper('carrier', CarrierDumper)
+def carrier_dumper(var, config):
+    pass
+
+
+@register_action('carrier', CarrierAction, CARRIER_SCHEMA)
+def carrier_action(var, config, args):
+    template_ = yield cg.templatable(config[CONF_DATA1], args, cg.uint32)
+    cg.add(var.set_data1(template_))
+    template_ = yield cg.templatable(config[CONF_DATA2], args, cg.uint32)
+    cg.add(var.set_data2(template_))
 
 # Panasonic
 (PanasonicData, PanasonicBinarySensor, PanasonicTrigger, PanasonicAction,
