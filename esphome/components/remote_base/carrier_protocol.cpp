@@ -8,12 +8,12 @@ static const char *TAG = "remote.carrier";
 
 static const uint8_t NBITS = 48;
 static const uint32_t HEADER_HIGH_US = 8400;
-static const uint32_t HEADER_LOW_US = 4170;
-static const uint32_t BIT_HIGH_US = 546;
+static const uint32_t HEADER_LOW_US = 4150;
+static const uint32_t BIT_HIGH_US = 550;
 static const uint32_t BIT_ONE_LOW_US = 1540;
-static const uint32_t BIT_ZERO_LOW_US = 490;
-static const uint32_t FOOTER_HIGH_US = 546;
-static const uint32_t FOOTER_LOW_US = 546;
+static const uint32_t BIT_ZERO_LOW_US = 500;
+static const uint32_t FOOTER_HIGH_US = 500;
+static const uint32_t FOOTER_LOW_US = 500;
 
 void CarrierProtocol::encode(RemoteTransmitData *dst, const CarrierData &data) {
   const uint32_t *pdata;
