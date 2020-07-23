@@ -46,7 +46,7 @@ optional<CarrierData> CarrierProtocol::decode(RemoteReceiveData src) {
     return {};
 
   for (uint8_t i = 0; i < NBITS; i++) {
-    pdata = (i<32) ? &out.data1 : &out.data2;
+    pdata = (i>=32) ? &out.data1 : &out.data2;
     *pdata <<= 1UL;
     if (src.expect_item(BIT_HIGH_US, BIT_ONE_LOW_US)) {
       *pdata |= 1UL;
