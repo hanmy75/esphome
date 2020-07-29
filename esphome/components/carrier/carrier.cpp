@@ -108,12 +108,16 @@ static void parse_data(uint64_t data) {
 
 void CarrierClimate::transmit_state() {
   static uint64_t count=0;
+  static climate::ClimateMode old_mode = climate::CLIMATE_MODE_OFF;
   uint8_t bit_shift, checksum = 0;
 
   /* Power on/off */
   switch (this->mode) {
-    case climate::CLIMATE_MODE_COOL:
     case climate::CLIMATE_MODE_AUTO:
+		if (old_mode == climate::CLIMATE_MODE_OFF)
+		  this->mode = climate::CLIMATE_MODE_COOL;
+
+    case climate::CLIMATE_MODE_COOL:
       remote_state &= ~(POWER_MASK);
       remote_state |= (1ULL << POWER_SHIFT);
       break;
@@ -124,6 +128,9 @@ void CarrierClimate::transmit_state() {
     default:
       break;
   }
+
+  /* Backup mode */
+  old_mode = this->mode;
 
   /* Fan control */
   switch (this->mode) {
@@ -165,7 +172,7 @@ void CarrierClimate::transmit_state() {
   remote_state |= (checksum << CHECKSUM_SHIFT);
 
   ESP_LOGD(TAG, "Sending carrier code: 0x%04x%08x", (uint32_t)(remote_state>>32), (uint32_t)(remote_state&0xffffffffULL));
-  parse_data(remote_state);
+  //parse_data(remote_state);
 
   auto transmit = this->transmitter_->transmit();
   auto data = transmit.get_data();
