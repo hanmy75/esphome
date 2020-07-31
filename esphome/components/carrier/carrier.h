@@ -12,8 +12,10 @@ const uint8_t CARRIER_TEMP_MAX = 30;  // Celsius
 class CarrierClimate : public climate_ir::ClimateIR {
  public:
   CarrierClimate() : climate_ir::ClimateIR(CARRIER_TEMP_MIN, CARRIER_TEMP_MAX) {}
+  void set_threshold(uint8_t threshold);
 
  protected:
+  uint8_t threshold_;
   /// Transmit via IR the state of this climate controller.
   void transmit_state() override;
   /// Current temperature changed.

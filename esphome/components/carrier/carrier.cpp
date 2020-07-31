@@ -68,6 +68,7 @@ static const uint64_t AUTO_FAN_SPEED = 31ULL;
 static const uint64_t DEFAULT_DATA = 0x0000c00000100000ULL | (FAN_MODE_COOLING << MODE_SHIFT) | (FAN_NUN_THREE <<FAN_NUM_SHIFT);
 static uint64_t remote_state = DEFAULT_DATA;
 
+#if 0
 static void parse_data(uint64_t data) {
 #if 0
   uint8_t  power, mode, pmv1, pmv2, temp, speed, fan_num, left_fan, right_fan;
@@ -104,6 +105,12 @@ static void parse_data(uint64_t data) {
 
   ESP_LOGD(TAG, "Checksum: actual (0x%02x) calculate (0x%02x)", checksum, cal_checksum);
 #endif
+}
+#endif
+
+void CarrierClimate::set_threshold(uint8_t threshold)
+{
+  this->threshold_ = threshold;
 }
 
 void CarrierClimate::transmit_state() {
@@ -202,7 +209,7 @@ void CarrierClimate::transmit_state() {
 
 void CarrierClimate::on_state() {
 
-	ESP_LOGD(TAG, "on_state: current %f, target %f", this->current_temperature, this->target_temperature);
+	ESP_LOGD(TAG, "on_state: current %f, target %f, threshold %d", this->current_temperature, this->target_temperature, this->threshold_);
 }
 
 bool CarrierClimate::on_receive(remote_base::RemoteReceiveData data) {
@@ -227,7 +234,7 @@ bool CarrierClimate::on_receive(remote_base::RemoteReceiveData data) {
     return false;
 
   ESP_LOGD(TAG, "Receive carrier code: 0x%04x%08x", (uint32_t)(receive_data>>32), (uint32_t)(receive_data&0xffffffffULL));
-  parse_data(receive_data);
+  //parse_data(receive_data);
 
   return true;
 }
