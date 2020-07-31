@@ -200,6 +200,11 @@ void CarrierClimate::transmit_state() {
 
 }
 
+void CarrierClimate::on_state() {
+
+	ESP_LOGD(TAG, "on_state: current %f, target %f", this->current_temperature, this->target_temperature);
+}
+
 bool CarrierClimate::on_receive(remote_base::RemoteReceiveData data) {
   uint64_t receive_data = 0;
 

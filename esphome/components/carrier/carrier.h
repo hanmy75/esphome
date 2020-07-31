@@ -16,6 +16,8 @@ class CarrierClimate : public climate_ir::ClimateIR {
  protected:
   /// Transmit via IR the state of this climate controller.
   void transmit_state() override;
+  /// Current temperature changed.
+  void on_state() override;
   /// Handle received IR Buffer
   bool on_receive(remote_base::RemoteReceiveData data) override;
 };
