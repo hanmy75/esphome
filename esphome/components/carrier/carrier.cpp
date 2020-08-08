@@ -12,6 +12,13 @@ namespace carrier {
 #define FAN_MODE_CLEANING     0x08ULL
 #define FAN_MODE_DEHUMIDITY   0x0AULL
 
+#define FAN_LEVEL_AUTO_COOLING	10ULL
+#define FAN_LEVEL_DEHUMIDITY	60ULL
+#define FAN_LEVEL_CLEANING		24ULL
+
+#define DEFAULT_FAN_SPEED		18ULL
+#define AUTO_FAN_SPEED			31ULL
+
 static const char *TAG = "carrier.climate";
 
 static const uint8_t NBITS = 48;
@@ -43,7 +50,7 @@ static const uint64_t SPEED_SHIFT = 24;
 static const uint64_t SPEED_MASK = (0x1fULL << SPEED_SHIFT);
 
 static const uint64_t TEMP_SHIFT = 16;
-static const uint64_t TEMP_MASK = (0xfULL << TEMP_SHIFT);
+static const uint64_t TEMP_MASK = (0x7fULL << TEMP_SHIFT);
 
 static const uint64_t POWER_SHIFT = 15;
 static const uint64_t POWER_MASK = (0x1ULL << POWER_SHIFT);
@@ -51,35 +58,33 @@ static const uint64_t POWER_MASK = (0x1ULL << POWER_SHIFT);
 static const uint64_t MODE_SHIFT = 36;
 static const uint64_t MODE_MASK = (0xfULL << MODE_SHIFT);
 
-static const uint64_t PMV1_SHIFT = 11;
-static const uint64_t PMV2_SHIFT = 20;
-static const uint64_t PMV_MASK = ((1ULL << PMV1_SHIFT) | (1ULL << PMV2_SHIFT));
+static const uint64_t PMV_SHIFT = 11;
+static const uint64_t PMV_MASK = (1ULL << PMV_SHIFT);
 
 static const uint64_t CHECKSUM_SHIFT = 0;
 static const uint64_t CHECKSUM_MASK = (0xffULL << CHECKSUM_SHIFT);
 
-static const uint64_t DEFAULT_FAN_SPEED = 18ULL;
-static const uint64_t AUTO_FAN_SPEED = 31ULL;
 
 /*
-  Temp    : min 17(1) ~ max 30(14) 
-  Speed   : min(5) ~ max(18), PMV(Auto) 31
+  Temp       : min 17 ~ max 30
+  PMV        : min 0  ~ max 12
+  Dehumidity : min 30 ~ max 70
+  Clean      : 24 (fix)
+  Speed      : min(5) ~ max(18), PMV(Auto) 31
 */
-static const uint64_t DEFAULT_DATA = 0x0000c00000100000ULL | (FAN_MODE_COOLING << MODE_SHIFT) | (FAN_NUN_THREE <<FAN_NUM_SHIFT);
+static const uint64_t DEFAULT_DATA = 0x0000c00000000000ULL | (FAN_NUN_THREE <<FAN_NUM_SHIFT);
 static uint64_t remote_state = DEFAULT_DATA;
 
-#if 0
 static void parse_data(uint64_t data) {
-#if 0
-  uint8_t  power, mode, pmv1, pmv2, temp, speed, fan_num, left_fan, right_fan;
+#if 1
+  uint8_t  power, mode, pmv, level, speed, fan_num, left_fan, right_fan;
   uint8_t  count, checksum;
 
   power     = (data & POWER_MASK) >> POWER_SHIFT;
   mode      = (data & MODE_MASK) >> MODE_SHIFT;
-  pmv1      = (data & PMV_MASK) >> PMV1_SHIFT;
-  pmv2      = (data & PMV_MASK) >> PMV2_SHIFT;
+  pmv      = (data & PMV_MASK) >> PMV_SHIFT;
 
-  temp      = (data & TEMP_MASK) >> TEMP_SHIFT;
+  level      = (data & TEMP_MASK) >> TEMP_SHIFT;
   speed     = (data & SPEED_MASK) >> SPEED_SHIFT;
   fan_num   = (data & FAN_NUM_MASK) >> FAN_NUM_SHIFT;
   left_fan  = (data & LEFT_FAN_MASK) >> LEFT_FAN_SHIFT;
@@ -88,8 +93,8 @@ static void parse_data(uint64_t data) {
   count    = (data & COUNT_MASK) >> COUNT_SHIFT;
   checksum    = (data & CHECKSUM_MASK) >> CHECKSUM_SHIFT;
 
-  ESP_LOGD(TAG, "Parse Data: power %d, mode %d, pmv(%d-%d), count %d, checksum 0x%02x", power, mode, pmv1, pmv2, count, checksum);
-  ESP_LOGD(TAG, "            temp %d, speed %d, fan_num %d, left_fan %d, right_fan %d", temp, speed, fan_num, left_fan, right_fan);
+  ESP_LOGD(TAG, "Parse Data: power %d, mode %d, pmv(%d), count %d, checksum 0x%02x", power, mode, pmv, count, checksum);
+  ESP_LOGD(TAG, "            level %d, speed %d, fan_num %d, left_fan %d, right_fan %d", level, speed, fan_num, left_fan, right_fan);
 #else
   int bit_shift;
   uint8_t  checksum, cal_checksum = 0;
@@ -106,7 +111,6 @@ static void parse_data(uint64_t data) {
   ESP_LOGD(TAG, "Checksum: actual (0x%02x) calculate (0x%02x)", checksum, cal_checksum);
 #endif
 }
-#endif
 
 void CarrierClimate::set_threshold(uint8_t threshold)
 {
@@ -121,9 +125,11 @@ void CarrierClimate::transmit_state() {
   /* Power on/off */
   switch (this->mode) {
     case climate::CLIMATE_MODE_AUTO:
-		if (old_mode == climate::CLIMATE_MODE_OFF)
-		  this->mode = climate::CLIMATE_MODE_COOL;
+      if (old_mode == climate::CLIMATE_MODE_OFF)
+        this->mode = climate::CLIMATE_MODE_COOL;
 
+    case climate::CLIMATE_MODE_DEHUMIDY:
+    case climate::CLIMATE_MODE_CLEAN:
     case climate::CLIMATE_MODE_COOL:
       remote_state &= ~(POWER_MASK);
       remote_state |= (1ULL << POWER_SHIFT);
@@ -142,26 +148,54 @@ void CarrierClimate::transmit_state() {
   /* Fan control */
   switch (this->mode) {
     case climate::CLIMATE_MODE_COOL:
-      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK);
-      remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT) | (1ULL << LEFT_FAN_SHIFT) | (1ULL << RIGHT_FAN_SHIFT) | (1ULL << PMV2_SHIFT);
+      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
+      remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT) | (1ULL << LEFT_FAN_SHIFT) | (1ULL << RIGHT_FAN_SHIFT);
+      remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
       break;
 
     case climate::CLIMATE_MODE_AUTO:
-      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK);
-      remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT) | (1ULL << PMV1_SHIFT);
+      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
+      remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT) | (1ULL << PMV_SHIFT);
+      remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
+      break;
+
+    case climate::CLIMATE_MODE_DEHUMIDY:
+      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
+      remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT);
+      remote_state |= (FAN_MODE_DEHUMIDITY << MODE_SHIFT);
+      break;
+
+    case climate::CLIMATE_MODE_CLEAN:
+      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
+      remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
+      remote_state |= (FAN_MODE_CLEANING << MODE_SHIFT);
       break;
 
     default:
       break;
   }
-  
-  /* Tempreture */
-  if (this->mode != climate::CLIMATE_MODE_OFF) {
-    auto temp = (uint64_t) roundf(clamp(this->target_temperature, CARRIER_TEMP_MIN, CARRIER_TEMP_MAX));
 
-	remote_state &= ~TEMP_MASK;
-    remote_state |= (temp-CARRIER_TEMP_MIN+1ULL) << TEMP_SHIFT;
+  /* Tempreture or Dehumidift Level */
+  auto level = (uint64_t) roundf(clamp(this->target_temperature, CARRIER_TEMP_MIN, CARRIER_TEMP_MAX));
+  switch (this->mode) {
+    case climate::CLIMATE_MODE_AUTO:
+      level = FAN_LEVEL_AUTO_COOLING;
+      break;
+
+    case climate::CLIMATE_MODE_DEHUMIDY:
+      level = FAN_LEVEL_DEHUMIDITY;
+      break;
+
+    case climate::CLIMATE_MODE_CLEAN:
+      level = FAN_LEVEL_CLEANING;
+      break;
+
+    default:
+      break;
   }
+
+  remote_state &= ~TEMP_MASK;
+  remote_state |= (level << TEMP_SHIFT);
 
   /* Counter */
   count = (count + 1) & 0x03;
@@ -209,12 +243,15 @@ void CarrierClimate::transmit_state() {
 
 void CarrierClimate::on_state() {
 
-	ESP_LOGD(TAG, "on_state: current %f, target %f, threshold %d", this->current_temperature, this->target_temperature, this->threshold_);
+  //ESP_LOGD(TAG, "on_state: current %f, target %f, threshold %d", this->current_temperature, this->target_temperature, this->threshold_);
+  if ((this->mode == climate::CLIMATE_MODE_COOL) && (this->current_temperature <= (this->target_temperature+this->threshold_))) {
+    this->mode = climate::CLIMATE_MODE_AUTO;
+    this->transmit_state();
+  }
 }
 
 bool CarrierClimate::on_receive(remote_base::RemoteReceiveData data) {
   uint64_t receive_data = 0;
-
 
   if (!data.expect_item(HEADER_MARK_US, HEADER_SPACE_US))
      return false;
@@ -234,7 +271,7 @@ bool CarrierClimate::on_receive(remote_base::RemoteReceiveData data) {
     return false;
 
   ESP_LOGD(TAG, "Receive carrier code: 0x%04x%08x", (uint32_t)(receive_data>>32), (uint32_t)(receive_data&0xffffffffULL));
-  //parse_data(receive_data);
+  parse_data(receive_data);
 
   return true;
 }
