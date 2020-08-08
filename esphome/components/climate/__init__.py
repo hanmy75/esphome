@@ -22,6 +22,8 @@ CLIMATE_MODES = {
     'AUTO': ClimateMode.CLIMATE_MODE_AUTO,
     'COOL': ClimateMode.CLIMATE_MODE_COOL,
     'HEAT': ClimateMode.CLIMATE_MODE_HEAT,
+    'DEHUMIDY': ClimateMode.CLIMATE_MODE_DEHUMIDY,
+    'CLEAN': ClimateMode.CLIMATE_MODE_CLEAN,
 }
 
 validate_climate_mode = cv.enum(CLIMATE_MODES, upper=True)

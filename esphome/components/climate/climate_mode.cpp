@@ -13,6 +13,10 @@ const char *climate_mode_to_string(ClimateMode mode) {
       return "COOL";
     case CLIMATE_MODE_HEAT:
       return "HEAT";
+    case CLIMATE_MODE_DEHUMIDY:
+	  return "DEHUMIDY";
+    case CLIMATE_MODE_CLEAN:
+      return "CLEAN";
     default:
       return "UNKNOWN";
   }

@@ -15,6 +15,10 @@ enum ClimateMode : uint8_t {
   CLIMATE_MODE_COOL = 2,
   /// The climate device is manually set to heat mode (not in auto mode!)
   CLIMATE_MODE_HEAT = 3,
+  /// Dehumidification. The climate device is manually set to heat mode (not in auto mode!)
+  CLIMATE_MODE_DEHUMIDY = 4,
+  /// Air Cleaning
+  CLIMATE_MODE_CLEAN = 5,
 };
 
 /// Enum for the current action of the climate device. Values match those of ClimateMode.
