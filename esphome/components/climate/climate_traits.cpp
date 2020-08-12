@@ -9,6 +9,8 @@ bool ClimateTraits::supports_mode(ClimateMode mode) const {
     case CLIMATE_MODE_OFF:
       return true;
     case CLIMATE_MODE_AUTO:
+    case CLIMATE_MODE_DEHUMIDY:
+    case CLIMATE_MODE_CLEAN:
       return this->supports_auto_mode_;
     case CLIMATE_MODE_COOL:
       return this->supports_cool_mode_;
