@@ -120,6 +120,7 @@ void CarrierClimate::set_threshold(uint8_t threshold)
 void CarrierClimate::transmit_state() {
   static uint64_t count=0;
   static climate::ClimateMode old_mode = climate::CLIMATE_MODE_OFF;
+  climate::ClimateMode control_mode;
   uint8_t bit_shift, checksum = 0;
 
   /* Power on/off */
@@ -142,11 +143,11 @@ void CarrierClimate::transmit_state() {
       break;
   }
 
-  /* Backup mode */
-  old_mode = this->mode;
+  /* Set control mode */
+  control_mode = (this->mode == climate::CLIMATE_MODE_OFF) ? old_mode : this->mode;
 
   /* Fan control */
-  switch (this->mode) {
+  switch (control_mode) {
     case climate::CLIMATE_MODE_COOL:
       remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
       remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT) | (1ULL << LEFT_FAN_SHIFT) | (1ULL << RIGHT_FAN_SHIFT);
@@ -177,7 +178,7 @@ void CarrierClimate::transmit_state() {
 
   /* Tempreture or Dehumidift Level */
   auto level = (uint64_t) roundf(clamp(this->target_temperature, CARRIER_TEMP_MIN, CARRIER_TEMP_MAX));
-  switch (this->mode) {
+  switch (control_mode) {
     case climate::CLIMATE_MODE_AUTO:
       level = FAN_LEVEL_AUTO_COOLING;
       break;
@@ -239,6 +240,8 @@ void CarrierClimate::transmit_state() {
   transmit.set_send_wait(LOOP_DELAY_US);
   transmit.perform();
 
+  /* Backup mode & level*/
+  old_mode = this->mode;
 }
 
 void CarrierClimate::on_state() {
