@@ -12,7 +12,7 @@ namespace carrier {
 #define FAN_MODE_CLEANING     0x08ULL
 #define FAN_MODE_DEHUMIDITY   0x0AULL
 
-#define FAN_LEVEL_AUTO_COOLING	10ULL
+#define FAN_LEVEL_AUTO_COOLING	0ULL
 #define FAN_LEVEL_DEHUMIDITY	60ULL
 #define FAN_LEVEL_CLEANING		24ULL
 
@@ -72,7 +72,7 @@ static const uint64_t CHECKSUM_MASK = (0xffULL << CHECKSUM_SHIFT);
   Clean      : 24 (fix)
   Speed      : min(5) ~ max(18), PMV(Auto) 31
 */
-static const uint64_t DEFAULT_DATA = 0x0000c00000000000ULL | (FAN_NUN_THREE <<FAN_NUM_SHIFT);
+static const uint64_t DEFAULT_DATA = 0x0000c00000000000ULL | (FAN_NUN_THREE <<FAN_NUM_SHIFT) | (1ULL << LEFT_FAN_SHIFT) | (1ULL << RIGHT_FAN_SHIFT);
 static uint64_t remote_state = DEFAULT_DATA;
 
 static void parse_data(uint64_t data) {
@@ -149,25 +149,25 @@ void CarrierClimate::transmit_state() {
   /* Fan control */
   switch (control_mode) {
     case climate::CLIMATE_MODE_COOL:
-      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
-      remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT) | (1ULL << LEFT_FAN_SHIFT) | (1ULL << RIGHT_FAN_SHIFT);
+      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
+      remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
       remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
       break;
 
     case climate::CLIMATE_MODE_AUTO:
-      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
+      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
       remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT) | (1ULL << PMV_SHIFT);
       remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
       break;
 
     case climate::CLIMATE_MODE_DEHUMIDY:
-      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
+      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
       remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT);
       remote_state |= (FAN_MODE_DEHUMIDITY << MODE_SHIFT);
       break;
 
     case climate::CLIMATE_MODE_CLEAN:
-      remote_state &= ~(SPEED_MASK | LEFT_FAN_MASK | RIGHT_FAN_MASK | PMV_MASK | MODE_MASK);
+      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
       remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
       remote_state |= (FAN_MODE_CLEANING << MODE_SHIFT);
       break;
