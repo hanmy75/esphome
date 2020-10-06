@@ -77,212 +77,215 @@ static uint64_t remote_state = DEFAULT_DATA;
 
 static void parse_data(uint64_t data) {
 #if 1
-  uint8_t  power, mode, pmv, level, speed, fan_num, left_fan, right_fan;
-  uint8_t  count, checksum;
+	uint8_t  power, mode, pmv, level, speed, fan_num, left_fan, right_fan;
+	uint8_t  count, checksum;
 
-  power     = (data & POWER_MASK) >> POWER_SHIFT;
-  mode      = (data & MODE_MASK) >> MODE_SHIFT;
-  pmv      = (data & PMV_MASK) >> PMV_SHIFT;
+	power     = (data & POWER_MASK) >> POWER_SHIFT;
+	mode      = (data & MODE_MASK) >> MODE_SHIFT;
+	pmv      = (data & PMV_MASK) >> PMV_SHIFT;
 
-  level      = (data & TEMP_MASK) >> TEMP_SHIFT;
-  speed     = (data & SPEED_MASK) >> SPEED_SHIFT;
-  fan_num   = (data & FAN_NUM_MASK) >> FAN_NUM_SHIFT;
-  left_fan  = (data & LEFT_FAN_MASK) >> LEFT_FAN_SHIFT;
-  right_fan = (data & RIGHT_FAN_MASK) >> RIGHT_FAN_SHIFT;
+	level      = (data & TEMP_MASK) >> TEMP_SHIFT;
+	speed     = (data & SPEED_MASK) >> SPEED_SHIFT;
+	fan_num   = (data & FAN_NUM_MASK) >> FAN_NUM_SHIFT;
+	left_fan  = (data & LEFT_FAN_MASK) >> LEFT_FAN_SHIFT;
+	right_fan = (data & RIGHT_FAN_MASK) >> RIGHT_FAN_SHIFT;
 
-  count    = (data & COUNT_MASK) >> COUNT_SHIFT;
-  checksum    = (data & CHECKSUM_MASK) >> CHECKSUM_SHIFT;
+	count    = (data & COUNT_MASK) >> COUNT_SHIFT;
+	checksum    = (data & CHECKSUM_MASK) >> CHECKSUM_SHIFT;
 
-  ESP_LOGD(TAG, "Parse Data: power %d, mode %d, pmv(%d), count %d, checksum 0x%02x", power, mode, pmv, count, checksum);
-  ESP_LOGD(TAG, "            level %d, speed %d, fan_num %d, left_fan %d, right_fan %d", level, speed, fan_num, left_fan, right_fan);
+	ESP_LOGD(TAG, "Parse Data: power %d, mode %d, pmv(%d), count %d, checksum 0x%02x", power, mode, pmv, count, checksum);
+	ESP_LOGD(TAG, "            level %d, speed %d, fan_num %d, left_fan %d, right_fan %d", level, speed, fan_num, left_fan, right_fan);
 #else
-  int bit_shift;
-  uint8_t  checksum, cal_checksum = 0;
+	int bit_shift;
+	uint8_t  checksum, cal_checksum = 0;
 
-  checksum = (data & CHECKSUM_MASK) >> CHECKSUM_SHIFT;
+	checksum = (data & CHECKSUM_MASK) >> CHECKSUM_SHIFT;
 
-  for(bit_shift=8; bit_shift<NBITS; bit_shift+=8)
-  {
-    cal_checksum += (data >> bit_shift) & 0xff;
-  }
+	for(bit_shift=8; bit_shift<NBITS; bit_shift+=8)
+	{
+		cal_checksum += (data >> bit_shift) & 0xff;
+	}
 
-  cal_checksum &= 0xff;
+	cal_checksum &= 0xff;
 
-  ESP_LOGD(TAG, "Checksum: actual (0x%02x) calculate (0x%02x)", checksum, cal_checksum);
+	ESP_LOGD(TAG, "Checksum: actual (0x%02x) calculate (0x%02x)", checksum, cal_checksum);
 #endif
 }
 
 void CarrierClimate::set_threshold(uint8_t threshold)
 {
-  this->threshold_ = threshold;
+	this->threshold_ = threshold;
 }
 
 void CarrierClimate::transmit_state() {
-  static uint64_t count=0;
-  static climate::ClimateMode old_mode = climate::CLIMATE_MODE_OFF;
-  climate::ClimateMode control_mode;
-  uint8_t bit_shift, checksum = 0;
+	static uint64_t count=0;
+	static climate::ClimateMode old_mode = climate::CLIMATE_MODE_OFF;
+	climate::ClimateMode control_mode;
+	uint8_t bit_shift, checksum = 0;
 
-  /* Power on/off */
-  switch (this->mode) {
-    case climate::CLIMATE_MODE_AUTO:
-      if (old_mode == climate::CLIMATE_MODE_OFF)
-        this->mode = climate::CLIMATE_MODE_COOL;
-
-#if 0
-    case climate::CLIMATE_MODE_DEHUMIDY:
-    case climate::CLIMATE_MODE_CLEAN:
-#endif
-    case climate::CLIMATE_MODE_COOL:
-      remote_state &= ~(POWER_MASK);
-      remote_state |= (1ULL << POWER_SHIFT);
-      break;
-
-    case climate::CLIMATE_MODE_OFF:
-      remote_state &= ~(POWER_MASK);
-      break;
-    default:
-      break;
-  }
-
-  /* Set control mode */
-  control_mode = (this->mode == climate::CLIMATE_MODE_OFF) ? old_mode : this->mode;
-
-  /* Fan control */
-  switch (control_mode) {
-    case climate::CLIMATE_MODE_COOL:
-      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
-      remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
-      remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
-      break;
-
-    case climate::CLIMATE_MODE_AUTO:
-      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
-      remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT) | (1ULL << PMV_SHIFT);
-      remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
-      break;
+	/* Power on/off */
+	switch (this->mode) {
+		case climate::CLIMATE_MODE_AUTO:
+			if (old_mode == climate::CLIMATE_MODE_OFF)
+				this->mode = climate::CLIMATE_MODE_COOL;
 
 #if 0
-    case climate::CLIMATE_MODE_DEHUMIDY:
-      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
-      remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT);
-      remote_state |= (FAN_MODE_DEHUMIDITY << MODE_SHIFT);
-      break;
-
-    case climate::CLIMATE_MODE_CLEAN:
-      remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
-      remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
-      remote_state |= (FAN_MODE_CLEANING << MODE_SHIFT);
-      break;
+			case climate::CLIMATE_MODE_DEHUMIDY:
+			case climate::CLIMATE_MODE_CLEAN:
 #endif
+		case climate::CLIMATE_MODE_COOL:
+			remote_state &= ~(POWER_MASK);
+			remote_state |= (1ULL << POWER_SHIFT);
+			break;
 
-    default:
-      break;
-  }
+		case climate::CLIMATE_MODE_OFF:
+			remote_state &= ~(POWER_MASK);
+			break;
 
-  /* Tempreture or Dehumidift Level */
-  auto level = (uint64_t) roundf(clamp(this->target_temperature, CARRIER_TEMP_MIN, CARRIER_TEMP_MAX));
-  switch (control_mode) {
-    case climate::CLIMATE_MODE_AUTO:
-      level = FAN_LEVEL_AUTO_COOLING;
-      break;
+		default:
+			break;
+	}
+
+	/* Set control mode */
+	control_mode = (this->mode == climate::CLIMATE_MODE_OFF) ? old_mode : this->mode;
+
+	/* Fan control */
+	switch (control_mode) {
+		case climate::CLIMATE_MODE_COOL:
+			remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
+			remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
+			remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
+			break;
+
+		case climate::CLIMATE_MODE_AUTO:
+			remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
+			remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT) | (1ULL << PMV_SHIFT);
+			remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
+				break;
 
 #if 0
-    case climate::CLIMATE_MODE_DEHUMIDY:
-      level = FAN_LEVEL_DEHUMIDITY;
-      break;
+		case climate::CLIMATE_MODE_DEHUMIDY:
+			remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
+			remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT);
+			remote_state |= (FAN_MODE_DEHUMIDITY << MODE_SHIFT);
+			break;
 
-    case climate::CLIMATE_MODE_CLEAN:
-      level = FAN_LEVEL_CLEANING;
-      break;
+		case climate::CLIMATE_MODE_CLEAN:
+			remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
+			remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
+			remote_state |= (FAN_MODE_CLEANING << MODE_SHIFT);
+			break;
 #endif
 
-    default:
-      break;
-  }
+		default:
+			break;
+	}
 
-  remote_state &= ~TEMP_MASK;
-  remote_state |= (level << TEMP_SHIFT);
+	/* Tempreture or Dehumidift Level */
+	auto level = (uint64_t) roundf(clamp(this->target_temperature, CARRIER_TEMP_MIN, CARRIER_TEMP_MAX));
+	switch (control_mode) {
+		case climate::CLIMATE_MODE_AUTO:
+			level = FAN_LEVEL_AUTO_COOLING;
+			break;
 
-  /* Counter */
-  count = (count + 1) & 0x03;
-  remote_state &= ~(COUNT_MASK);
-  remote_state |= (count << COUNT_SHIFT);
+#if 0
+		case climate::CLIMATE_MODE_DEHUMIDY:
+			level = FAN_LEVEL_DEHUMIDITY;
+			break;
 
-  /* Checksum */
-  for(bit_shift=8; bit_shift<NBITS; bit_shift+=8)
-  {
-    checksum += (remote_state >> bit_shift) & 0xff;
-  }
-  checksum &= 0xff;
+		case climate::CLIMATE_MODE_CLEAN:
+			level = FAN_LEVEL_CLEANING;
+			break;
+#endif
 
-  remote_state &= ~(CHECKSUM_MASK);
-  remote_state |= (checksum << CHECKSUM_SHIFT);
+		default:
+			break;
+	}
 
-  ESP_LOGD(TAG, "Sending carrier code: 0x%04x%08x", (uint32_t)(remote_state>>32), (uint32_t)(remote_state&0xffffffffULL));
-  //parse_data(remote_state);
+	remote_state &= ~TEMP_MASK;
+	remote_state |= (level << TEMP_SHIFT);
 
-  auto transmit = this->transmitter_->transmit();
-  auto data = transmit.get_data();
+	/* Counter */
+	count = (count + 1) & 0x03;
+	remote_state &= ~(COUNT_MASK);
+	remote_state |= (count << COUNT_SHIFT);
 
-  data->set_carrier_frequency(38000);
+	/* Checksum */
+	for(bit_shift=8; bit_shift<NBITS; bit_shift+=8)
+	{
+		checksum += (remote_state >> bit_shift) & 0xff;
+	}
+	checksum &= 0xff;
 
-  // Header
-  data->mark(HEADER_MARK_US);
-  data->space(HEADER_SPACE_US);
+	remote_state &= ~(CHECKSUM_MASK);
+	remote_state |= (checksum << CHECKSUM_SHIFT);
 
-  // Data
-  for (uint8_t i = 0; i < NBITS; i++) {
-	uint64_t mask = (1ULL<<(NBITS-i-1));
-    data->mark(BIT_MARK_US);
-    data->space((remote_state & mask) ? BIT_ONE_SPACE_US : BIT_ZERO_SPACE_US);
-  }
+	ESP_LOGD(TAG, "Sending carrier code: 0x%04x%08x", (uint32_t)(remote_state>>32), (uint32_t)(remote_state&0xffffffffULL));
+	//parse_data(remote_state);
 
-  // Footer
-  data->mark(FOOTER_MARK_US);
-  data->space(FOOTER_SPACE_US);  // Pause before repeating
+	auto transmit = this->transmitter_->transmit();
+	auto data = transmit.get_data();
 
-  transmit.set_send_times(NREPEAT);
-  transmit.set_send_wait(LOOP_DELAY_US);
-  transmit.perform();
+	data->set_carrier_frequency(38000);
 
-  /* Backup mode & level*/
-  old_mode = this->mode;
+	// Header
+	data->mark(HEADER_MARK_US);
+	data->space(HEADER_SPACE_US);
+
+	// Data
+	for (uint8_t i = 0; i < NBITS; i++) {
+		uint64_t mask = (1ULL<<(NBITS-i-1));
+		data->mark(BIT_MARK_US);
+		data->space((remote_state & mask) ? BIT_ONE_SPACE_US : BIT_ZERO_SPACE_US);
+	}
+
+	// Footer
+	data->mark(FOOTER_MARK_US);
+	data->space(FOOTER_SPACE_US);  // Pause before repeating
+
+	transmit.set_send_times(NREPEAT);
+	transmit.set_send_wait(LOOP_DELAY_US);
+	transmit.perform();
+
+	/* Backup mode & level*/
+	old_mode = this->mode;
 }
 
 void CarrierClimate::on_state() {
 
-  //ESP_LOGD(TAG, "on_state: current %f, target %f, threshold %d", this->current_temperature, this->target_temperature, this->threshold_);
-  if ((this->mode == climate::CLIMATE_MODE_COOL) && (this->current_temperature <= (this->target_temperature+this->threshold_))) {
-    this->mode = climate::CLIMATE_MODE_AUTO;
-    this->transmit_state();
-  }
+	//ESP_LOGD(TAG, "on_state: current %f, target %f, threshold %d", this->current_temperature, this->target_temperature, this->threshold_);
+	if ((this->mode == climate::CLIMATE_MODE_COOL) && (this->current_temperature <= (this->target_temperature+this->threshold_))) {
+		this->mode = climate::CLIMATE_MODE_AUTO;
+		this->transmit_state();
+	}
 }
 
 bool CarrierClimate::on_receive(remote_base::RemoteReceiveData data) {
-  uint64_t receive_data = 0;
+	uint64_t receive_data = 0;
 
-  if (!data.expect_item(HEADER_MARK_US, HEADER_SPACE_US))
-     return false;
+	if (!data.expect_item(HEADER_MARK_US, HEADER_SPACE_US))
+		return false;
 
-  for (uint8_t i = 0; i < NBITS; i++) {
-    receive_data <<= 1UL;
-    if (data.expect_item(BIT_MARK_US, BIT_ONE_SPACE_US)) {
-	  receive_data |= 1UL;
-    } else if (data.expect_item(BIT_MARK_US, BIT_ZERO_SPACE_US)) {
-	  receive_data |= 0UL;
-    } else {
-	  return false;
-    }
-  }
+	for (uint8_t i = 0; i < NBITS; i++) {
+		receive_data <<= 1UL;
+		if (data.expect_item(BIT_MARK_US, BIT_ONE_SPACE_US)) {
+			receive_data |= 1UL;
+		}
+		else if (data.expect_item(BIT_MARK_US, BIT_ZERO_SPACE_US)) {
+			receive_data |= 0UL;
+		}
+		else {
+			return false;
+		}
+	}
 
-  if (!data.expect_mark(FOOTER_MARK_US))
-    return false;
+	if (!data.expect_mark(FOOTER_MARK_US))
+		return false;
 
-  ESP_LOGD(TAG, "Receive carrier code: 0x%04x%08x", (uint32_t)(receive_data>>32), (uint32_t)(receive_data&0xffffffffULL));
-  parse_data(receive_data);
+	ESP_LOGD(TAG, "Receive carrier code: 0x%04x%08x", (uint32_t)(receive_data>>32), (uint32_t)(receive_data&0xffffffffULL));
+	parse_data(receive_data);
 
-  return true;
+	return true;
 }
 
 }  // namespace carrier
