@@ -129,10 +129,9 @@ void CarrierClimate::transmit_state() {
 			if (old_mode == climate::CLIMATE_MODE_OFF)
 				this->mode = climate::CLIMATE_MODE_COOL;
 
-#if 0
-			case climate::CLIMATE_MODE_DEHUMIDY:
-			case climate::CLIMATE_MODE_CLEAN:
-#endif
+		case climate::CLIMATE_MODE_DRY:
+		case climate::CLIMATE_MODE_FAN_ONLY:
+
 		case climate::CLIMATE_MODE_COOL:
 			remote_state &= ~(POWER_MASK);
 			remote_state |= (1ULL << POWER_SHIFT);
@@ -163,19 +162,17 @@ void CarrierClimate::transmit_state() {
 			remote_state |= (FAN_MODE_COOLING << MODE_SHIFT);
 				break;
 
-#if 0
-		case climate::CLIMATE_MODE_DEHUMIDY:
+		case climate::CLIMATE_MODE_DRY:
 			remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
 			remote_state |= (AUTO_FAN_SPEED << SPEED_SHIFT);
 			remote_state |= (FAN_MODE_DEHUMIDITY << MODE_SHIFT);
 			break;
 
-		case climate::CLIMATE_MODE_CLEAN:
+		case climate::CLIMATE_MODE_FAN_ONLY:
 			remote_state &= ~(SPEED_MASK | PMV_MASK | MODE_MASK);
 			remote_state |= (DEFAULT_FAN_SPEED << SPEED_SHIFT);
 			remote_state |= (FAN_MODE_CLEANING << MODE_SHIFT);
 			break;
-#endif
 
 		default:
 			break;
@@ -188,15 +185,13 @@ void CarrierClimate::transmit_state() {
 			level = FAN_LEVEL_AUTO_COOLING;
 			break;
 
-#if 0
-		case climate::CLIMATE_MODE_DEHUMIDY:
+		case climate::CLIMATE_MODE_DRY:
 			level = FAN_LEVEL_DEHUMIDITY;
 			break;
 
-		case climate::CLIMATE_MODE_CLEAN:
+		case climate::CLIMATE_MODE_FAN_ONLY:
 			level = FAN_LEVEL_CLEANING;
 			break;
-#endif
 
 		default:
 			break;
