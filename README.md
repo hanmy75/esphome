@@ -1,2 +1,8 @@
-# MY esphome
-Clone from https://github.com/esphome/esphome.git v1.14.5
+### MY esphome
+Clone from https://github.com/esphome/esphome.git
+
+### Install ESPHome
+```
+$ cd esphome/
+$ script/setup
+```

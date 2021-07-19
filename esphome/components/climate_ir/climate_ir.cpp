@@ -33,6 +33,7 @@ void ClimateIR::setup() {
     this->sensor_->add_on_state_callback([this](float state) {
       this->current_temperature = state;
       // current temperature changed, publish state
+      this->on_state();
       this->publish_state();
     });
     this->current_temperature = this->sensor_->state;
