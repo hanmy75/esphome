@@ -165,6 +165,8 @@ enum LightRestoreMode {
   LIGHT_RESTORE_DEFAULT_ON,
   LIGHT_ALWAYS_OFF,
   LIGHT_ALWAYS_ON,
+  LIGHT_RESTORE_INVERTED_DEFAULT_OFF,
+  LIGHT_RESTORE_INVERTED_DEFAULT_ON,
 };
 
 /** This class represents the communication layer between the front-end MQTT layer and the
@@ -242,6 +244,13 @@ class LightState : public Nameable, public Component {
    */
   void add_new_remote_values_callback(std::function<void()> &&send_callback);
 
+  /**
+   * The callback is called once the state of current_values and remote_values are equal
+   *
+   * @param send_callback
+   */
+  void add_new_target_state_reached_callback(std::function<void()> &&send_callback);
+
   /// Return whether the light has any effects that meet the trait requirements.
   bool supports_effects();
 
@@ -318,6 +327,12 @@ class LightState : public Nameable, public Component {
    * starting with the beginning of the transition.
    */
   CallbackManager<void()> remote_values_callback_{};
+
+  /** Callback to call when the state of current_values and remote_values are equal
+   * This should be called once the state of current_values changed and equals the state of remote_values
+   */
+  CallbackManager<void()> target_state_reached_callback_{};
+
   LightOutput *output_;  ///< Store the output to allow effects to have more access.
   /// Whether the light value should be written in the next cycle.
   bool next_write_{true};

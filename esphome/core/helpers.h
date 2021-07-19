@@ -21,6 +21,10 @@
 #define ALWAYS_INLINE __attribute__((always_inline))
 #define PACKED __attribute__((packed))
 
+#define xSemaphoreWait(semaphore, wait_time) \
+  xSemaphoreTake(semaphore, wait_time); \
+  xSemaphoreGive(semaphore);
+
 namespace esphome {
 
 /// The characters that are allowed in a hostname.
@@ -42,6 +46,7 @@ std::string to_string(float val);
 std::string to_string(double val);
 std::string to_string(long double val);
 optional<float> parse_float(const std::string &str);
+optional<int> parse_int(const std::string &str);
 
 /// Sanitize the hostname by removing characters that are not in the allowlist and truncating it to 63 chars.
 std::string sanitize_hostname(const std::string &hostname);
@@ -88,7 +93,7 @@ float clamp(float val, float min, float max);
 float lerp(float completion, float start, float end);
 
 /// std::make_unique
-template<typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&... args) {
+template<typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&...args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
@@ -132,6 +137,8 @@ uint32_t reverse_bits_32(uint32_t x);
 uint16_t encode_uint16(uint8_t msb, uint8_t lsb);
 /// Decode a 16-bit unsigned integer into an array of two values: most significant byte, least significant byte.
 std::array<uint8_t, 2> decode_uint16(uint16_t value);
+/// Encode a 32-bit unsigned integer given four bytes in MSB -> LSB order
+uint32_t encode_uint32(uint8_t msb, uint8_t byte2, uint8_t byte3, uint8_t lsb);
 
 /***
  * An interrupt helper class.
@@ -314,5 +321,20 @@ template<typename T> class Parented {
 };
 
 uint32_t fnv1_hash(const std::string &str);
+
+template<typename T> T *new_buffer(size_t length) {
+  T *buffer;
+#ifdef ARDUINO_ARCH_ESP32
+  if (psramFound()) {
+    buffer = (T *) ps_malloc(length);
+  } else {
+    buffer = new T[length];
+  }
+#else
+  buffer = new T[length];
+#endif
+
+  return buffer;
+}
 
 }  // namespace esphome

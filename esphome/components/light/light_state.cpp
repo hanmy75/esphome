@@ -106,10 +106,20 @@ void LightState::setup() {
   switch (this->restore_mode_) {
     case LIGHT_RESTORE_DEFAULT_OFF:
     case LIGHT_RESTORE_DEFAULT_ON:
+    case LIGHT_RESTORE_INVERTED_DEFAULT_OFF:
+    case LIGHT_RESTORE_INVERTED_DEFAULT_ON:
       this->rtc_ = global_preferences.make_preference<LightStateRTCState>(this->get_object_id_hash());
-      // Attempt to load from preferences, else fall back to default values from struct
+      // Attempt to load from preferences, else fall back to default values
       if (!this->rtc_.load(&recovered)) {
-        recovered.state = this->restore_mode_ == LIGHT_RESTORE_DEFAULT_ON;
+        recovered.state = false;
+        if (this->restore_mode_ == LIGHT_RESTORE_DEFAULT_ON ||
+            this->restore_mode_ == LIGHT_RESTORE_INVERTED_DEFAULT_ON) {
+          recovered.state = true;
+        }
+      } else if (this->restore_mode_ == LIGHT_RESTORE_INVERTED_DEFAULT_OFF ||
+                 this->restore_mode_ == LIGHT_RESTORE_INVERTED_DEFAULT_ON) {
+        // Inverted restore state
+        recovered.state = !recovered.state;
       }
       break;
     case LIGHT_ALWAYS_OFF:
@@ -145,6 +155,7 @@ void LightState::loop() {
   if (this->transformer_ != nullptr) {
     if (this->transformer_->is_finished()) {
       this->remote_values = this->current_values = this->transformer_->get_end_values();
+      this->target_state_reached_callback_.call();
       if (this->transformer_->publish_at_end())
         this->publish_state();
       this->transformer_ = nullptr;
@@ -336,6 +347,9 @@ void LightCall::perform() {
     this->parent_->set_immediately_(v, this->publish_);
   }
 
+  if (!this->has_transition_()) {
+    this->parent_->target_state_reached_callback_.call();
+  }
   if (this->publish_) {
     this->parent_->publish_state();
   }
@@ -393,15 +407,15 @@ LightColorValues LightCall::validate_() {
     this->color_temperature_.reset();
   }
 
-  // sets RGB to 100% if only White specified
+  // If white channel is specified, set RGB to white color (when interlock is enabled)
   if (this->white_.has_value()) {
-    if (!this->red_.has_value() && !this->green_.has_value() && !this->blue_.has_value()) {
-      this->red_ = optional<float>(1.0f);
-      this->green_ = optional<float>(1.0f);
-      this->blue_ = optional<float>(1.0f);
-    }
-    // make white values binary aka 0.0f or 1.0f...this allows brightness to do its job
     if (traits.get_supports_color_interlock()) {
+      if (!this->red_.has_value() && !this->green_.has_value() && !this->blue_.has_value()) {
+        this->red_ = optional<float>(1.0f);
+        this->green_ = optional<float>(1.0f);
+        this->blue_ = optional<float>(1.0f);
+      }
+      // make white values binary aka 0.0f or 1.0f... this allows brightness to do its job
       if (*this->white_ > 0.0f) {
         this->white_ = optional<float>(1.0f);
       } else {
@@ -409,42 +423,27 @@ LightColorValues LightCall::validate_() {
       }
     }
   }
-  // White to 0% if (exclusively) setting any RGB value that isn't 255,255,255
+  // If only a color channel is specified, set white channel to 100% for white, otherwise 0% (when interlock is enabled)
   else if (this->red_.has_value() || this->green_.has_value() || this->blue_.has_value()) {
-    if (*this->red_ == 1.0f && *this->green_ == 1.0f && *this->blue_ == 1.0f && traits.get_supports_rgb_white_value() &&
-        traits.get_supports_color_interlock()) {
-      this->white_ = optional<float>(1.0f);
-    } else if (!this->white_.has_value() || !traits.get_supports_rgb_white_value()) {
-      this->white_ = optional<float>(0.0f);
+    if (traits.get_supports_color_interlock()) {
+      if (*this->red_ == 1.0f && *this->green_ == 1.0f && *this->blue_ == 1.0f) {
+        this->white_ = optional<float>(1.0f);
+      } else {
+        this->white_ = optional<float>(0.0f);
+      }
     }
   }
-  // if changing Kelvin alone, change to white light
+  // If only a color temperature is specified, change to white light
   else if (this->color_temperature_.has_value()) {
-    if (!traits.get_supports_color_interlock()) {
-      if (!this->red_.has_value() && !this->green_.has_value() && !this->blue_.has_value()) {
-        this->red_ = optional<float>(1.0f);
-        this->green_ = optional<float>(1.0f);
-        this->blue_ = optional<float>(1.0f);
-      }
-    }
-    // if setting Kelvin from color (i.e. switching to white light), set White to 100%
+    this->red_ = optional<float>(1.0f);
+    this->green_ = optional<float>(1.0f);
+    this->blue_ = optional<float>(1.0f);
+
+    // if setting color temperature from color (i.e. switching to white light), set White to 100%
     auto cv = this->parent_->remote_values;
     bool was_color = cv.get_red() != 1.0f || cv.get_blue() != 1.0f || cv.get_green() != 1.0f;
-    bool now_white = *this->red_ == 1.0f && *this->blue_ == 1.0f && *this->green_ == 1.0f;
-    if (traits.get_supports_color_interlock()) {
-      if (cv.get_white() < 1.0f) {
-        this->white_ = optional<float>(1.0f);
-      }
-
-      if (was_color && !this->red_.has_value() && !this->green_.has_value() && !this->blue_.has_value()) {
-        this->red_ = optional<float>(1.0f);
-        this->green_ = optional<float>(1.0f);
-        this->blue_ = optional<float>(1.0f);
-      }
-    } else {
-      if (!this->white_.has_value() && was_color && now_white) {
-        this->white_ = optional<float>(1.0f);
-      }
+    if (traits.get_supports_color_interlock() || was_color) {
+      this->white_ = optional<float>(1.0f);
     }
   }
 
@@ -752,6 +751,10 @@ void LightState::current_values_as_cwww(float *cold_white, float *warm_white, bo
 void LightState::add_new_remote_values_callback(std::function<void()> &&send_callback) {
   this->remote_values_callback_.add(std::move(send_callback));
 }
+void LightState::add_new_target_state_reached_callback(std::function<void()> &&send_callback) {
+  this->target_state_reached_callback_.add(std::move(send_callback));
+}
+
 LightEffect *LightState::get_active_effect_() {
   if (this->active_effect_index_ == 0)
     return nullptr;
